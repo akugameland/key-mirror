@@ -1,0 +1,55 @@
+TUŞ YANSIT (Key Mirror): iki bilgisayar arası W A S D + Shift + Ctrl + fare
+===========================================================================
+
+NE YAPAR?
+- Gönderen bilgisayarda bastığın W, A, S, D, Shift, Ctrl ve fare (hareket, tıklar, tekerlek), ev ağındaki
+  alan bilgisayarda da aynı anda basılır. Başka hiçbir tuş gönderilmez.
+
+KURULUM (iki bilgisayarda da)
+1) Klasörü bilgisayara kopyala (ya da GitHub'dan Code → Download ZIP ile indirip çıkar).
+2) BASLAT.bat'a çift tıkla. İlk açılışta KURULUM.bat'ı kendisi çalıştırır: Python 3.12 yoksa kurar
+   (winget, yönetici izni gerekmez). Ek paket yoktur. Yeniden kurmak güvenlidir.
+
+KULLANIM
+1) Alan bilgisayar: programı aç, "Bu bilgisayar" → "Alan" seç. Ekranda 10 karakterlik eşleştirme kodu ve
+   bilgisayarın adresi görünür. Windows güvenlik duvarı izin sorarsa yalnız "Özel ağlar"ı işaretle.
+2) Gönderen bilgisayar: "Gönderen" seç, alanın kodunu yaz, "Bul ve bağlan"a bas. Bulamazsa alanın ekranındaki
+   adresi (ör. 192.168.1.20) "Alanın adresi" kutusuna yazıp tekrar bas. "Alan cevap veriyor" yazmalı.
+3) F7 ile yansıtmayı aç (gönderende sol üstte kırmızı "● YANSITMA AÇIK", alanda "● UZAKTAN GİRDİ" görünür).
+   F7 ile kapat. Program her açılışta kapalı başlar.
+- "Fareyi de gönder" kutusu kapatılırsa yalnız tuşlar gider.
+- Alanda "Gelen tuşları uygula" kutusu kaldırılırsa gelen hiçbir şey basılmaz.
+- Kodu değiştirmek için alanda "Yeni kod". Eski kodu bilen artık bağlanamaz.
+
+GÜVENLİK
+- İki taraflı beyaz liste: gönderen yalnız W A S D, Shift, Ctrl ve fareyi yollar; şifre ve sohbet gibi diğer
+  tuşlar bilgisayardan çıkmaz. Alan da başka bir tuş gelse bile basmaz.
+- Eşleştirme kodu ağdan gönderilmez. Paketler bu koddan türetilen anahtarla şifrelenir ve imzalanır: kodu
+  bilmeyen paket okuyamaz, uyduramaz, değiştiremez.
+- Kaydedilmiş eski paketler işe yaramaz (sıra numarası + alanın her açılışta yeni rastgele değeri).
+- Yalnız ev ağı adreslerinden gelen paket kabul edilir; internetten gelen atılır.
+- Aynı anda tek gönderen bağlanabilir.
+- 1 saniye paket gelmezse alan basılı tuşların hepsini bırakır.
+- Tuşlar kaydedilmez. hata.log yalnız bağlanma ve açma/kapama olaylarını yazar. Yönetici izni gerekmez.
+- ayarlar.json eşleştirme kodunu tutar: kimseyle paylaşma (GitHub'a da gitmez).
+
+OYUNLAR İÇİN UYARI
+- Birçok çevrimiçi oyun programla basılan girdiyi otomasyon sayar. İki oyun istemcisini aynı anda yönetmek
+  (multiboxing) birçok oyunun kurallarına aykırıdır ve hesabın kapatılmasına yol açabilir. Hile korumaları
+  programla basılan tuşları yok sayabilir. Kullanmadan önce oyunun kurallarına bak.
+
+SORUN GİDERME
+- "Alandan cevap yok": kod doğru mu, alan açık mı, iki bilgisayar aynı ağda mı? Alanda güvenlik duvarı izni
+  verilmemiş olabilir: Windows Güvenliği → Güvenlik duvarı → Uygulamaya izin ver → Python → "Özel" işaretli olmalı.
+- Alanda kırmızı "yönetici olarak çalışıyor" uyarısı: öndeki program yönetici olarak açık; alan programı da
+  BASLAT.bat'a sağ tık → Yönetici olarak çalıştır ile aç.
+- Fare alanda farklı hızda gidiyorsa: alanda Windows fare ayarlarındaki "İşaretçi hassasiyetini artır" seçeneği
+  hareketi değiştirir; iki bilgisayarda aynı ayar olmalı.
+
+DOSYALAR
+tus_yansit.py  ana pencere (iki rol)
+ag.py          şifreli, imzalı UDP protokolü (port 47810)
+girdi.py       yakalama (Raw Input) ve basma (SendInput), tuş beyaz listesi
+yetki.py       öndeki pencere yönetici mi
+metinler.py    Türkçe / English metinler
+test\          test_guvenlik.py (26 güvenlik/protokol testi), test_gercek.py, test_arayuz.py

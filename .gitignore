@@ -1,0 +1,6 @@
+ayarlar.json
+hata.log
+*.log
+.venv/
+__pycache__/
+*.pyc
