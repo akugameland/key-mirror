@@ -1,9 +1,15 @@
-TUŞ YANSIT (Key Mirror): iki bilgisayar arası W A S D + Shift + Ctrl + fare
-===========================================================================
+TUŞ YANSIT (Key Mirror): iki bilgisayar arası seçilen tuşlar + fare
+====================================================================
 
 NE YAPAR?
-- Gönderen bilgisayarda bastığın W, A, S, D, Shift, Ctrl ve fare (hareket, tıklar, tekerlek), ev ağındaki
-  alan bilgisayarda da aynı anda basılır. Başka hiçbir tuş gönderilmez.
+- Gönderen bilgisayarda bastığın tuşlar ve fare (hareket, tıklar, tekerlek), ev ağındaki alan bilgisayarda da
+  aynı anda basılır. Hangi tuşların gideceğini ALAN seçer (varsayılan: W, A, S, D, Shift, Ctrl). Listede olmayan
+  hiçbir tuş gönderilmez.
+
+GÜNCELLEME (2026-10-21)
+- Alan, basılabilecek tuşları kendi klavyesinden seçer (ekle / çıkar).
+- Sol / sağ / orta / yan tık ve tekerlek artık çalışıyor (gönderen önceden bunları hiç algılamıyordu).
+- Ağ protokolü değişti (sürüm 3): İKİ BİLGİSAYARI DA güncelle, yoksa birbirini görmez.
 
 KURULUM (iki bilgisayarda da)
 1) Klasörü bilgisayara kopyala (ya da GitHub'dan Code → Download ZIP ile indirip çıkar).
@@ -21,9 +27,18 @@ KULLANIM
 - Alanda "Gelen tuşları uygula" kutusu kaldırılırsa gelen hiçbir şey basılmaz.
 - Kodu değiştirmek için alanda "Yeni kod". Eski kodu bilen artık bağlanamaz.
 
+TUŞ SEÇME (alanda)
+- "Basılabilecek tuşlar" listesi alanın penceresinde durur. Gönderen yalnız bu tuşları yollar.
+- "Tuş ekle"ye bas, sonra ALANIN KENDİ KLAVYESİNDE eklemek istediğin tuşa bas. Esc vazgeçer.
+- Listeden bir tuşu seçip "Seçileni çıkar" ile kaldır. "Varsayılana dön" W A S D, Shift, Ctrl'e döndürür.
+- Windows tuşu, menü tuşu, F1–F12 ve Scroll Lock eklenemez (F tuşları yansıtmayı açıp kapamak için ayrılmış).
+- Liste ayarlar.json'a kaydedilir; gönderen yeni listeyi bir saniye içinde öğrenir ve penceresinde gösterir.
+
 GÜVENLİK
-- İki taraflı beyaz liste: gönderen yalnız W A S D, Shift, Ctrl ve fareyi yollar; şifre ve sohbet gibi diğer
-  tuşlar bilgisayardan çıkmaz. Alan da başka bir tuş gelse bile basmaz.
+- İki taraflı beyaz liste, alan seçer: gönderen yalnız alanın listesindeki tuşları ve fareyi yollar; listede
+  olmayan tuşlar bilgisayardan çıkmaz. Alan da listesinde olmayan bir tuş gelse bile basmaz.
+- DİKKAT: alan harf tuşları eklediyse, yansıtma açıkken gönderende o harflerle yazdığın her şey (ör. sohbet) alanda
+  da yazılır. Şifre ya da sohbet yazmadan önce F7 ile yansıtmayı kapat.
 - Eşleştirme kodu ağdan gönderilmez. Paketler bu koddan türetilen anahtarla şifrelenir ve imzalanır: kodu
   bilmeyen paket okuyamaz, uyduramaz, değiştiremez.
 - Kaydedilmiş eski paketler işe yaramaz (sıra numarası + alanın her açılışta yeni rastgele değeri).
@@ -49,7 +64,8 @@ SORUN GİDERME
 DOSYALAR
 tus_yansit.py  ana pencere (iki rol)
 ag.py          şifreli, imzalı UDP protokolü (port 47810)
-girdi.py       yakalama (Raw Input) ve basma (SendInput), tuş beyaz listesi
+girdi.py       yakalama (Raw Input) ve basma (SendInput), alanın tuş listesi, yasak tuşlar
 yetki.py       öndeki pencere yönetici mi
 metinler.py    Türkçe / English metinler
-test\          test_guvenlik.py (26 güvenlik/protokol testi), test_gercek.py, test_arayuz.py
+test\          test_guvenlik.py (37 güvenlik/protokol testi), test_gercek.py, test_arayuz.py,
+               test_tik.py (gerçek sol / sağ tık; yalnız kendi test penceresine tıklar)

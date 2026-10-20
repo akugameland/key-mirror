@@ -2,10 +2,13 @@
 
 **English** · [Türkçe](#türkçe)
 
-Press **W A S D, Shift, Ctrl** and use the **mouse** on one Windows PC, and the same input is pressed on a
-second PC on your home network at the same time. Nothing else is sent.
+Press keys and use the **mouse** on one Windows PC, and the same input is pressed on a second PC on your home
+network at the same time. **The receiver chooses which keys** (default: W A S D, Shift, Ctrl). Nothing else is sent.
 
 - Two roles in one app: **Sender** (the PC you use) and **Receiver** (the PC that repeats the input).
+- **Choose the keys on the receiver:** press **Add key**, then press the key on the receiver's own keyboard.
+  Select a key and press **Remove selected** to take it off, or **Reset to default**. The Windows key, the menu key
+  and F1–F12 / Scroll Lock can never be added.
 - Mirroring starts **off**; toggle it with **F7** (changeable to F1–F12 / Scroll Lock). While it is on, a red
   `● MIRRORING ON` label stays in the top-left corner of the sender, and `● REMOTE INPUT` on the receiver.
 - Mouse: movement, left/right/middle/side buttons and wheel (can be turned off).
@@ -15,9 +18,12 @@ second PC on your home network at the same time. Nothing else is sent.
 
 Built to be safe on a home network:
 
-- **Whitelist on both sides.** The sender only ever sends W A S D, left/right Shift and left/right Ctrl (plus the
-  mouse). Every other key, such as passwords and chat, never leaves the PC. The receiver also refuses to press any
-  key outside that list, even if one arrives.
+- **Whitelist on both sides, chosen by the receiver.** The receiver sends its key list to the sender inside the
+  encrypted, signed heartbeat. The sender only ever sends keys on that list (plus the mouse); every other key never
+  leaves the PC. The receiver also refuses to press any key outside its list, even if one arrives.
+- **Typing while mirroring is on:** if the receiver adds letter keys, anything you type with those letters on the
+  sender (for example in chat) is also typed on the receiver. Turn mirroring off with F7 before typing passwords or
+  chat.
 - **Pairing code.** The receiver shows a random 10-character code (~50 bits). The code itself is never sent over the
   network; it is only used to derive the keys (PBKDF2-SHA256, 200,000 rounds).
 - **Encrypted and signed packets.** Each packet is encrypted (HMAC-SHA256 keystream) and signed (HMAC-SHA256).
@@ -53,6 +59,11 @@ the receiver shows a red warning and you can start it as administrator (right-cl
    shown on its screen). "Receiver is answering" means you are connected.
 5. Press **F7** to start mirroring, **F7** again to stop.
 
+## Updating
+
+Version 3 of the network protocol (receiver-chosen keys) does not talk to older copies: update **both** PCs.
+This update also fixes left / right / middle / side clicks and the wheel, which were not picked up on the sender.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
@@ -61,18 +72,23 @@ MIT. See [LICENSE](LICENSE).
 
 ## Türkçe
 
-Bir Windows bilgisayarda **W A S D, Shift, Ctrl** tuşlarına basıp **fareyi** kullandığında, aynı girdi ev ağındaki
-ikinci bilgisayarda da aynı anda basılır. Başka hiçbir şey gönderilmez.
+Bir Windows bilgisayarda tuşlara basıp **fareyi** kullandığında, aynı girdi ev ağındaki ikinci bilgisayarda da aynı
+anda basılır. **Hangi tuşların gideceğini alan seçer** (varsayılan: W A S D, Shift, Ctrl). Başka hiçbir şey gönderilmez.
 
 - Tek programda iki rol: **Gönderen** (kullandığın bilgisayar) ve **Alan** (girdiyi tekrarlayan bilgisayar).
+- **Tuşları alanda seç:** **Tuş ekle**'ye bas, sonra alanın kendi klavyesinde o tuşa bas. Çıkarmak için listeden seçip
+  **Seçileni çıkar**, baştaki listeye dönmek için **Varsayılana dön**. Windows tuşu, menü tuşu ve F1–F12 / Scroll Lock
+  hiçbir zaman eklenemez.
 - Yansıtma **kapalı** başlar; **F7** ile açılıp kapanır (F1–F12 ya da Scroll Lock yapılabilir). Açıkken gönderende
   sol üstte kırmızı `● YANSITMA AÇIK`, alanda `● UZAKTAN GİRDİ` yazısı durur.
 - Fare: hareket, sol/sağ/orta/yan tuşlar ve tekerlek (kapatılabilir).
 - Türkçe ve İngilizce arayüz. Yalnız Python standart kütüphanesi, ek paket yok.
 
 **Güvenlik:**
-- İki taraflı beyaz liste: yalnız W A S D, Shift ve Ctrl gönderilir. Şifre ve sohbet gibi diğer tuşlar bilgisayardan
-  çıkmaz. Alan da listede olmayan bir tuşu asla basmaz.
+- İki taraflı beyaz liste, alan seçer: alan listesini şifreli ve imzalı nabız cevabıyla gönderene bildirir. Gönderen
+  yalnız o listedeki tuşları yollar; listede olmayan hiçbir tuş bilgisayardan çıkmaz. Alan da listede olmayanı asla basmaz.
+- Yansıtma açıkken yazı yazma: alan harf tuşları eklediyse, gönderende o harflerle yazdığın her şey (ör. sohbet) alanda
+  da yazılır. Şifre ya da sohbet yazmadan önce F7 ile yansıtmayı kapat.
 - 10 karakterlik eşleştirme kodu ağdan hiç gönderilmez; yalnız anahtar türetmede kullanılır.
 - Paketler şifreli ve imzalıdır. Kodu bilmeyen paketleri okuyamaz, uyduramaz, değiştiremez.
 - Kaydedilmiş eski paketler tekrar gönderilse de işe yaramaz.
@@ -85,6 +101,9 @@ ikinci bilgisayarda da aynı anda basılır. Başka hiçbir şey gönderilmez.
 **Oyunlar için uyarı:** Birçok çevrimiçi oyun, programla basılan girdiyi otomasyon sayar. İki oyun istemcisini aynı
 anda yönetmek (multiboxing) birçok oyunun kurallarına aykırıdır ve hesabın kapatılmasına yol açabilir. Hile korumaları
 programla basılan tuşları yok sayabilir. Kullanmadan önce oyununun kurallarına bak; sorumluluk kullanıcıdadır.
+
+**Güncelleme:** Bu sürümün ağ protokolü (sürüm 3) eski kopyalarla konuşmaz; **iki bilgisayarı da** güncelle. Bu sürüm
+gönderende hiç algılanmayan sol / sağ / orta / yan tıkları ve tekerleği de düzeltir.
 
 **Kurulum:** Depoyu **iki bilgisayara da** indir (Code → Download ZIP), klasöre çıkar, `BASLAT.bat`'a çift tıkla.
 Python 3.12 yoksa kendisi kurar. Alan bilgisayarda **Alan** seç ve kodu not al. Gönderende **Gönderen** seç, kodu yaz,

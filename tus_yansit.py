@@ -1,10 +1,11 @@
-"""Tuş Yansıt (Key Mirror): bir bilgisayarda basılan W A S D, Shift, Ctrl ve fareyi yerel ağdaki ikinci
-bilgisayarda da aynı anda basar. Türkçe / English. Yalnız Python standart kütüphanesi.
+"""Tuş Yansıt (Key Mirror): bir bilgisayarda basılan tuşları ve fareyi yerel ağdaki ikinci bilgisayarda da aynı
+anda basar. Türkçe / English. Yalnız Python standart kütüphanesi.
 
 Gönderen: tuşlara basılan bilgisayar. Yansıtma kapalı başlar, açma/kapama tuşuyla (varsayılan F7) açılır;
-açıkken ekranın sol üstünde kırmızı gösterge durur. Beyaz listedeki tuşlar dışında hiçbir tuş gönderilmez.
+açıkken ekranın sol üstünde kırmızı gösterge durur. Yalnız alanın seçtiği tuşlar gönderilir.
 Alan: tuşların da basılacağı bilgisayar. Eşleştirme kodunu gösterir; yalnız o kodu bilen gönderenden gelen,
-şifreli ve imzalı paketleri uygular. Güvenlik ayrıntıları: ag.py.
+şifreli ve imzalı paketleri uygular. Hangi tuşların basılabileceğini kendi klavyesinden seçer
+(ekle / çıkar; varsayılan W A S D, Shift, Ctrl). Güvenlik ayrıntıları: ag.py.
 """
 import ctypes
 import json
@@ -38,7 +39,7 @@ import yetki  # noqa: E402
 from metinler import DIL_ADLARI, t, varsayilan_dil  # noqa: E402
 
 VARSAYILAN = {"dil": "", "rol": "gonderen", "kod": "", "hedef_kod": "", "hedef_ip": "", "ac_kapa": 0x41,
-              "fare": True}
+              "fare": True, "izinli_tuslar": [[t, e] for t, e in sorted(girdi.TUSLAR)]}
 KIRMIZI, YESIL, SARI, GRI, MAVI = "#ff5a5a", "#4dff6a", "#ffd84a", "#bdbdbd", "#8fd0ff"
 ARKA, ON, KUTU = "#1e1f24", "#e8e8e8", "#2b2d34"
 ANAHTAR_RENK = "#010203"
@@ -60,6 +61,11 @@ def ayar_yukle() -> dict:
         a["kod"] = ag.yeni_kod()
     if a["ac_kapa"] not in girdi.F_TUSLARI:
         a["ac_kapa"] = 0x41
+    try:                                               # alanın tuş listesi: bozuksa varsayılana dön
+        a["izinli_tuslar"] = [[int(t), bool(e)] for t, e in a["izinli_tuslar"]
+                              if girdi.izin_verilir_mi(int(t), bool(e))][:girdi.EN_COK_TUS]
+    except (TypeError, ValueError):
+        a["izinli_tuslar"] = list(VARSAYILAN["izinli_tuslar"])
     return a
 
 
@@ -99,7 +105,7 @@ class Uygulama:
         self.ayar = ayar_yukle()
         self._kaydet()
         self.kok = tk.Tk()
-        self.kok.geometry("600x560")
+        self.kok.geometry("620x720")
         self.kok.configure(bg=ARKA)
         self.kok.protocol("WM_DELETE_WINDOW", self.kapat)
         self.kok.report_callback_exception = lambda *a: logging.error("arayüz hatası", exc_info=a)
@@ -119,7 +125,8 @@ class Uygulama:
         self._bildir("", GRI)
         # alan durumu
         self.alici = None
-        self.basici = girdi.Basici()
+        self.basici = girdi.Basici(self.ayar["izinli_tuslar"])
+        self._ekleyici = None                          # alanda "tuş ekle" beklerken geçici klavye dinleyici
         self._engel = False
         self._calisiyor = True
         self._rolu_kur()
@@ -149,6 +156,7 @@ class Uygulama:
             self.yakalayici.kapat()
         if self.alici:
             self.alici.kapat()
+        self._ekleme_bitir()
         self.yakalayici = self.gonderici = self.alici = None
         self.basici.hepsini_birak()
 
@@ -227,6 +235,28 @@ class Uygulama:
         self.uygula = tk.BooleanVar(value=self.alici.etkin if self.alici else True)
         tk.Checkbutton(c, text=self.m("uygula"), variable=self.uygula, command=self._uygula_degisti, bg=ARKA, fg=ON,
                        selectcolor=KUTU, activebackground=ARKA, activeforeground=ON).grid(row=5, column=1, sticky="w")
+        # Basılabilecek tuşlar: alan kendi klavyesinden ekler / çıkarır
+        etiket(self.m("izinli"), 6)
+        liste = tk.Frame(c, bg=ARKA)
+        liste.grid(row=6, column=1, sticky="ew", pady=(6, 0))
+        self.tus_listesi = tk.Listbox(liste, height=9, bg=KUTU, fg=ON, selectbackground="#3d5a80", relief="flat",
+                                      font=("Segoe UI", 10), activestyle="none", exportselection=False)
+        kaydirma = tk.Scrollbar(liste, command=self.tus_listesi.yview)
+        self.tus_listesi.config(yscrollcommand=kaydirma.set)
+        self.tus_listesi.pack(side="left", fill="both", expand=True)
+        kaydirma.pack(side="left", fill="y")
+        dugmeler = tk.Frame(liste, bg=ARKA)
+        dugmeler.pack(side="left", fill="y", padx=(8, 0))
+        self.ekle_dugme = tk.Button(dugmeler, text=self.m("tus_ekle"), command=self._ekleme_baslat, bg=KUTU, fg=ON,
+                                    relief="flat", width=18)
+        self.ekle_dugme.pack(fill="x")
+        tk.Button(dugmeler, text=self.m("tus_cikar"), command=self._tus_cikar, bg=KUTU, fg=ON,
+                  relief="flat").pack(fill="x", pady=4)
+        tk.Button(dugmeler, text=self.m("tus_varsayilan"), command=self._tus_varsayilan, bg=KUTU, fg=ON,
+                  relief="flat").pack(fill="x")
+        tk.Label(c, text=self.m("izinli_aciklama"), bg=ARKA, fg=GRI, font=("Segoe UI", 8), wraplength=420,
+                 justify="left").grid(row=7, column=1, sticky="w")
+        self._listeyi_yaz()
         self.sayac = tk.Label(k, bg=ARKA, fg=GRI, font=("Segoe UI", 9))
         self.sayac.pack(anchor="w", pady=(8, 0))
 
@@ -276,6 +306,74 @@ class Uygulama:
         self.ayar["kod"] = ag.yeni_kod()
         self._kaydet()
         self._rolu_kur()
+
+    # ── alan: tuş listesi ────────────────────────────────────────────────────
+    def _listeyi_yaz(self):
+        dil = self.ayar["dil"]
+        self._liste_sirasi = sorted(((t, bool(e)) for t, e in self.ayar["izinli_tuslar"]),
+                                    key=lambda te: (len(girdi.tus_adi(*te, dil)) > 1, girdi.tus_adi(*te, dil).lower()))
+        self.tus_listesi.delete(0, "end")
+        for t, e in self._liste_sirasi:
+            self.tus_listesi.insert("end", girdi.tus_adi(t, e, self.ayar["dil"]))
+
+    def _liste_kaydet(self, tuslar):
+        self.ayar["izinli_tuslar"] = [[t, e] for t, e in sorted(self.basici.izinli_ayarla(tuslar))]
+        self._kaydet()
+        logging.info("alanın tuş listesi: %s", self.ayar["izinli_tuslar"])
+        self._listeyi_yaz()
+
+    def _ekleme_baslat(self):
+        if self._ekleyici:
+            return self._ekleme_bitir()
+        try:
+            # Yalnız bu bilgisayarın gerçek klavyesi: uzaktan basılan (enjekte) tuşlar zaten atlanır
+            self._ekleyici = girdi.Yakalayici(self._eklenen_tus, lambda *a: None, lambda *a: None, lambda *a: None,
+                                              self._eklenen_f)
+        except RuntimeError:
+            logging.exception("tuş ekleme dinleyicisi")
+            return
+        self.ekle_dugme.config(text=self.m("tus_bekle_ekle"))
+
+    def _ekleme_bitir(self):
+        if self._ekleyici:
+            self._ekleyici.kapat()
+            self._ekleyici = None
+        if self.ayar["rol"] == "alan" and getattr(self, "ekle_dugme", None) and self.ekle_dugme.winfo_exists():
+            self.ekle_dugme.config(text=self.m("tus_ekle"))
+
+    def _eklenen_tus(self, tarama, e0, basili):
+        """Dinleyici iş parçacığından: arayüze aktar."""
+        if basili:
+            self.kok.after(0, lambda: self._tus_eklendi(tarama, e0))
+
+    def _eklenen_f(self, tarama):
+        self.kok.after(0, lambda: (self._ekleme_bitir(), self._bildir(self.m("tus_ayrilmis"), SARI)))
+
+    def _tus_eklendi(self, tarama, e0):
+        if not self._ekleyici:
+            return
+        self._ekleme_bitir()
+        if tarama == 0x01 and not e0:                  # Esc: vazgeç
+            return
+        mevcut = {(t, bool(e)) for t, e in self.ayar["izinli_tuslar"]}
+        if (tarama, e0) in mevcut:
+            return self._bildir(self.m("tus_zaten", tus=girdi.tus_adi(tarama, e0, self.ayar["dil"])), SARI)
+        if len(mevcut) >= girdi.EN_COK_TUS:
+            return self._bildir(self.m("tus_dolu", n=girdi.EN_COK_TUS), SARI)
+        self._liste_kaydet(mevcut | {(tarama, e0)})
+        self._bildir(self.m("tus_eklendi", tus=girdi.tus_adi(tarama, e0, self.ayar["dil"])), YESIL)
+
+    def _tus_cikar(self):
+        secili = self.tus_listesi.curselection()
+        if not secili:
+            return self._bildir(self.m("tus_sec"), SARI)
+        cikan = self._liste_sirasi[secili[0]]
+        self._liste_kaydet({(t, bool(e)) for t, e in self.ayar["izinli_tuslar"]} - {cikan})
+        self._bildir(self.m("tus_cikarildi", tus=girdi.tus_adi(*cikan, self.ayar["dil"])), GRI)
+
+    def _tus_varsayilan(self):
+        self._ekleme_bitir()
+        self._liste_kaydet(set(girdi.TUSLAR))
 
     def _uygula_degisti(self):
         if self.alici:
@@ -395,25 +493,34 @@ class Uygulama:
         taze = bool(bildirim) and time.time() - b_zaman < 5
         if self.ayar["rol"] == "alan":
             a = self.alici
-            metin, renk = (bildirim, b_renk) if bildirim and not a else (self.m("bekleniyor"), GRI)
+            metin, renk = (bildirim, b_renk) if bildirim and (not a or taze) else (self.m("bekleniyor"), GRI)
             if a:
                 self.sayac.config(text=self.m("sayac", **a.sayac))
                 bagli = time.time() - a.son_paket < 1.5
                 self._engel = yetki.tuslar_engelli_mi() if bagli and a.uzak_acik else False
                 if self._engel:
                     metin, renk = self.m("yonetici"), KIRMIZI
-                elif bagli and a.gonderen:
-                    metin, renk = self.m("baglandi", ip=a.gonderen[0]), YESIL
                 elif taze:
                     metin, renk = bildirim, b_renk
+                elif bagli and a.gonderen:
+                    metin, renk = self.m("baglandi", ip=a.gonderen[0]), YESIL
                 self.gosterge.goster(self.m("gosterge_alan") if bagli and a.uzak_acik and a.etkin else None, MAVI)
         else:
             tus = girdi.F_TUSLARI[self.ayar["ac_kapa"]]
             self.buyuk.config(text=self.m("yansitma_acik" if self.acik else "yansitma_kapali"),
                               fg=KIRMIZI if self.acik else GRI)
             self.aciklama.config(text=self.m("acik_aciklama" if self.acik else "kapali_aciklama", tus=tus))
-            self.yansitilan.config(text=self.m("yansitilan", fare=self.m("fare_ek") if self.ayar["fare"] else ""))
             g = self.gonderici
+            fare = self.m("fare_ek") if self.ayar["fare"] else ""
+            if g and g.bagli_mi() and g.alan_tuslari:
+                anahtar = (g.alan_tuslari, self.ayar["dil"])
+                if getattr(self, "_ad_onbellek", (None, ""))[0] != anahtar:
+                    adlar = sorted((girdi.tus_adi(t, e, self.ayar["dil"]) for t, e in g.alan_tuslari),
+                                   key=lambda a: (len(a) > 1, a.lower()))
+                    self._ad_onbellek = (anahtar, ", ".join(adlar))
+                self.yansitilan.config(text=self.m("yansitilan", tuslar=self._ad_onbellek[1], fare=fare))
+            else:
+                self.yansitilan.config(text=self.m("yansitilan_bekle"))
             metin, renk = "", GRI
             if taze:
                 metin, renk = bildirim, b_renk

@@ -5,8 +5,10 @@ akışını Python kodu dönene kadar bekletir; 1000 Hz oyun faresinde gecikme y
 hiçbir tuşu ya da fare hareketini bekletmez ve engellemez (CanYouSpeak fare.py dersi). Programla basılan
 (enjekte) girdiler hDevice = 0 ile gelir ve atlanır: iki program aynı bilgisayarda çalışsa da döngü olmaz.
 
-Yalnız şu tuşlar yansıtılır (tarama kodu, E0 bayrağı): W A S D, sol/sağ Shift, sol/sağ Ctrl.
-Gönderen başka tuşları hiç göndermez; alan da başka tuş gelirse basmaz (iki taraflı beyaz liste).
+Hangi tuşların yansıtılacağını ALAN seçer (kendi klavyesinden ekler / çıkarır; varsayılan: W A S D, Shift, Ctrl).
+Alan listesini nabız cevabıyla gönderene bildirir. Gönderen yalnız o listedeki tuşları gönderir; alan da listesinde
+olmayan tuşu basmaz (iki taraflı beyaz liste). YASAK listesindeki tuşlar (Windows, menü, F1-F12 / Scroll Lock)
+hiçbir zaman seçilemez ve yansıtılmaz.
 """
 import ctypes
 import logging
@@ -15,12 +17,13 @@ from ctypes import wintypes
 
 log = logging.getLogger("girdi")
 
-# (tarama kodu, E0 genişletilmiş mi) -> ad
+# Varsayılan liste (alan değiştirebilir): (tarama kodu, E0 genişletilmiş mi) -> ad
 TUSLAR = {
     (0x11, False): "W", (0x1E, False): "A", (0x1F, False): "S", (0x20, False): "D",
     (0x2A, False): "Sol Shift", (0x36, False): "Sağ Shift",
     (0x1D, False): "Sol Ctrl", (0x1D, True): "Sağ Ctrl",
 }
+EN_COK_TUS = 60                                       # alanın listesi en çok bu kadar tuş (paket boyu sınırı)
 # Fare düğmeleri: 0 sol, 1 sağ, 2 orta, 3 yan1 (geri), 4 yan2 (ileri)
 DUGME_ADLARI = ["Sol tık", "Sağ tık", "Orta tık", "Yan tuş 1", "Yan tuş 2"]
 
@@ -28,13 +31,28 @@ DUGME_ADLARI = ["Sol tık", "Sağ tık", "Orta tık", "Yan tuş 1", "Yan tuş 2"
 F_TUSLARI = {0x3B: "F1", 0x3C: "F2", 0x3D: "F3", 0x3E: "F4", 0x3F: "F5", 0x40: "F6", 0x41: "F7", 0x42: "F8",
              0x43: "F9", 0x44: "F10", 0x57: "F11", 0x58: "F12", 0x46: "Scroll Lock"}
 
+# Asla seçilemeyen / yansıtılmayan tuşlar: Windows tuşları ve menü tuşu (sistem kısayolları),
+# Windows'un ok tuşlarıyla ürettiği sahte Shift'ler (E0 2A / E0 36), Num Lock ile karışan E0 45.
+YASAK = {(0x5B, True), (0x5C, True), (0x5D, True), (0x2A, True), (0x36, True), (0x45, True)}
+# Yan tuş adları (Windows'un kendi adları dile göre tutarsız): (tarama, e0) -> (tr, en)
+YAN_ADLAR = {(0x2A, False): ("Sol Shift", "Left Shift"), (0x36, False): ("Sağ Shift", "Right Shift"),
+             (0x1D, False): ("Sol Ctrl", "Left Ctrl"), (0x1D, True): ("Sağ Ctrl", "Right Ctrl"),
+             (0x38, False): ("Sol Alt", "Left Alt"), (0x38, True): ("Sağ Alt", "Right Alt"),
+             (0x39, False): ("Boşluk", "Space")}
+
+
+def izin_verilir_mi(tarama: int, e0: bool) -> bool:
+    """Bu tuş alanın listesine eklenebilir / yansıtılabilir mi?"""
+    return 0 < tarama < 0x80 and (tarama, bool(e0)) not in YASAK and not (tarama in F_TUSLARI and not e0)
+
+
 _u32 = ctypes.WinDLL("user32", use_last_error=True)
 _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
 WM_INPUT, WM_CLOSE, WM_DESTROY = 0x00FF, 0x0010, 0x0002
 RIDEV_INPUTSINK = 0x00000100
 RID_INPUT, RIM_TYPEMOUSE, RIM_TYPEKEYBOARD = 0x10000003, 0, 1
-RI_KEY_BREAK, RI_KEY_E0 = 0x01, 0x02
+RI_KEY_BREAK, RI_KEY_E0, RI_KEY_E1 = 0x01, 0x02, 0x04
 MOUSE_MOVE_ABSOLUTE = 0x01
 HWND_MESSAGE = wintypes.HWND(-3)
 # RAWMOUSE.usButtonFlags -> (düğme, basılı)
@@ -57,6 +75,19 @@ _u32.PostMessageW.argtypes = (wintypes.HWND, wintypes.UINT, wintypes.WPARAM, win
 _u32.DestroyWindow.argtypes = (wintypes.HWND,)
 _u32.GetRawInputData.argtypes = (wintypes.HANDLE, wintypes.UINT, ctypes.c_void_p, ctypes.POINTER(wintypes.UINT),
                                  wintypes.UINT)
+_u32.GetKeyNameTextW.argtypes = (wintypes.LONG, wintypes.LPWSTR, ctypes.c_int)
+_u32.UnregisterClassW.argtypes = (wintypes.LPCWSTR, wintypes.HINSTANCE)
+
+
+def tus_adi(tarama: int, e0: bool, dil: str = "tr") -> str:
+    """Tuşun okunur adı (klavye düzenine göre, ör. Türkçe Q klavyede "Ğ")."""
+    yan = YAN_ADLAR.get((tarama, bool(e0)))
+    if yan:
+        return yan[0] if dil == "tr" else yan[1]
+    tampon = ctypes.create_unicode_buffer(64)
+    if _u32.GetKeyNameTextW((tarama << 16) | (1 << 24 if e0 else 0), tampon, 64) > 0:
+        return tampon.value
+    return f"#{tarama:02X}{' E0' if e0 else ''}"
 
 
 class WNDCLASSEXW(ctypes.Structure):
@@ -77,7 +108,10 @@ class RAWINPUTHEADER(ctypes.Structure):
 
 
 class RAWMOUSE(ctypes.Structure):
-    _fields_ = [("usFlags", wintypes.USHORT), ("usButtonFlags", wintypes.USHORT),
+    # Windows'ta usFlags'tan sonra 4 baytlık hizalanmış bir birleşim (ulButtons / usButtonFlags+usButtonData) gelir:
+    # arada 2 bayt boşluk var. Boşluk yazılmazsa düğme bayrakları hep 0 okunur ve tıklar / tekerlek hiç gelmez
+    # (2026-10-21 hatası: "sol tık, sağ tık çalışmıyor"). Doğru konumlar: usButtonFlags 4, usButtonData 6.
+    _fields_ = [("usFlags", wintypes.USHORT), ("_bosluk", wintypes.USHORT), ("usButtonFlags", wintypes.USHORT),
                 ("usButtonData", wintypes.USHORT), ("ulRawButtons", wintypes.ULONG),
                 ("lLastX", wintypes.LONG), ("lLastY", wintypes.LONG), ("ulExtraInformation", wintypes.ULONG)]
 
@@ -97,8 +131,11 @@ class RAWINPUT(ctypes.Structure):
 
 class Yakalayici:
     """Gönderen tarafı. Geri çağrılar kendi iş parçacığında çalışır, kısa tutulmalı:
-    tus(tarama, e0, basili), fare_hareket(dx, dy), fare_dugme(no, basili), teker(miktar, yatay),
+    tus(tarama, e0, basili) (izin_verilir_mi olan her tuş; hangisinin gideceğine çağıran karar verir),
+    fare_hareket(dx, dy), fare_dugme(no, basili), teker(miktar, yatay),
     f_tusu(tarama) (F1-F12 / Scroll Lock basıldığında: açma/kapama ve tuş atama için; yansıtılmaz)."""
+
+    _sayac = 0
 
     def __init__(self, tus, fare_hareket, fare_dugme, teker, f_tusu, enjekteleri_al: bool = False):
         self._tus, self._hareket, self._dugme, self._teker, self._f_tusu = tus, fare_hareket, fare_dugme, teker, f_tusu
@@ -119,10 +156,14 @@ class Yakalayici:
         try:
             self._wndproc = WNDPROC(self._islev)            # referans tutulmazsa çöp toplanır ve çöker
             hinst = _k32.GetModuleHandleW(None)
+            # Her dinleyiciye ayrı sınıf adı: aynı ad ikinci kez kaydedilemez ve yeni pencere eski (silinmiş)
+            # dinleyicinin işlevini çağırırdı (rol değiştirme, alanda "tuş ekle").
+            Yakalayici._sayac += 1
+            self._sinif_adi = f"TusYansitGirdi{Yakalayici._sayac}"
             sinif = WNDCLASSEXW(cbSize=ctypes.sizeof(WNDCLASSEXW), lpfnWndProc=self._wndproc,
-                                hInstance=hinst, lpszClassName="TusYansitGirdi")
+                                hInstance=hinst, lpszClassName=self._sinif_adi)
             _u32.RegisterClassExW(ctypes.byref(sinif))
-            hwnd = _u32.CreateWindowExW(0, "TusYansitGirdi", None, 0, 0, 0, 0, 0, HWND_MESSAGE, None, hinst, None)
+            hwnd = _u32.CreateWindowExW(0, self._sinif_adi, None, 0, 0, 0, 0, 0, HWND_MESSAGE, None, hinst, None)
             aygitlar = (RAWINPUTDEVICE * 2)(RAWINPUTDEVICE(0x01, 0x06, RIDEV_INPUTSINK, hwnd),   # klavye
                                             RAWINPUTDEVICE(0x01, 0x02, RIDEV_INPUTSINK, hwnd))   # fare
             if not _u32.RegisterRawInputDevices(aygitlar, 2, ctypes.sizeof(RAWINPUTDEVICE)):
@@ -138,6 +179,7 @@ class Yakalayici:
         mesaj = wintypes.MSG()
         while _u32.GetMessageW(ctypes.byref(mesaj), None, 0, 0) > 0:
             _u32.DispatchMessageW(ctypes.byref(mesaj))
+        _u32.UnregisterClassW(self._sinif_adi, _k32.GetModuleHandleW(None))
 
     def _islev(self, hwnd, msg, wparam, lparam):
         try:
@@ -162,6 +204,8 @@ class Yakalayici:
         return _u32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
     def _klavye(self, k: RAWKEYBOARD):
+        if k.Flags & RI_KEY_E1:                        # Pause: tuhaf dizi, yansıtılmaz
+            return
         basili = not (k.Flags & RI_KEY_BREAK)
         e0 = bool(k.Flags & RI_KEY_E0)
         if k.MakeCode in F_TUSLARI and not e0:
@@ -169,8 +213,8 @@ class Yakalayici:
                 self._f_tusu(k.MakeCode)
             (self._basili_f.add if basili else self._basili_f.discard)(k.MakeCode)
             return
-        # E0 2A / E0 36: Windows'un ok tuşlarıyla ürettiği sahte Shift'ler; gerçek Shift değil
-        if (k.MakeCode, e0) in TUSLAR:
+        # E0 2A / E0 36: Windows'un ok tuşlarıyla ürettiği sahte Shift'ler; gerçek Shift değil (YASAK'ta)
+        if izin_verilir_mi(k.MakeCode, e0):
             self._tus(k.MakeCode, e0, basili)
 
     def _fare(self, m: RAWMOUSE):
@@ -231,13 +275,24 @@ def _gonder(*girdiler: INPUT) -> bool:
 class Basici:
     """Alan tarafı. Basılı tuş ve düğmeleri izler: bağlantı koparsa hepsi bırakılabilsin."""
 
-    def __init__(self):
+    def __init__(self, izinli=None):
         self.basili_tuslar: set[tuple[int, bool]] = set()
         self.basili_dugmeler: set[int] = set()
         self._kilit = threading.Lock()
+        self.izinli: frozenset = frozenset(TUSLAR)
+        self.izinli_ayarla(TUSLAR if izinli is None else izinli)
+
+    def izinli_ayarla(self, tuslar) -> frozenset:
+        """Alanın seçtiği liste (YASAK olanlar ve fazlası atılır). Listeden çıkan ama basılı olan tuş bırakılır."""
+        temiz = [(int(t), bool(e)) for t, e in tuslar if izin_verilir_mi(int(t), bool(e))]
+        self.izinli = frozenset(temiz[:EN_COK_TUS])
+        for t in list(self.basili_tuslar - self.izinli):
+            self.tus(*t, False)
+        return self.izinli
 
     def tus(self, tarama: int, e0: bool, basili: bool) -> bool:
-        if (tarama, e0) not in TUSLAR:                 # beyaz liste dışı: asla basma
+        if (tarama, e0) not in self.izinli and not ((tarama, e0) in self.basili_tuslar and not basili):
+            # beyaz liste dışı: asla basma (listeden yeni çıkarılmış basılı bir tuşu bırakmak serbest)
             log.warning("izin verilmeyen tuş geldi, basılmadı: %#x", tarama)
             return False
         with self._kilit:

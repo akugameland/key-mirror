@@ -11,7 +11,9 @@ Güvenlik (kullanıcı isteği 2026-10-17: "güvenli yap, riske atma"):
 - Yalnız özel ağ adresleri (192.168.x, 10.x, 172.16-31.x, link-local) kabul edilir: modemde port açılsa bile
   internetten gelen paket uygulanmaz.
 - Aynı anda tek gönderen: bir gönderen bağlıyken (son 5 sn içinde paket geldiyse) başka oturum kabul edilmez.
-- Alan yalnız beyaz listedeki tuşları basar (girdi.TUSLAR); başka tuş gelirse uygulanmaz.
+- Hangi tuşların basılabileceğini ALAN seçer (girdi.Basici.izinli). Liste nabız cevabıyla (şifreli, imzalı)
+  gönderene bildirilir; gönderen yalnız o tuşları yollar, alan listesinde olmayanı basmaz.
+  Windows / menü tuşu ve F1-F12 hiçbir zaman listeye giremez (girdi.YASAK).
 
 Paket: b"TY" | sürüm(1) | tür(1) | oturum(8) | alan_nonce(8) | sıra(8) | şifreli içerik | imza(16)
 
@@ -29,10 +31,12 @@ import struct
 import threading
 import time
 
+import girdi
+
 log = logging.getLogger("ag")
 
 PORT = 47810
-SURUM = 2
+SURUM = 3                                             # 3: nabız cevabı alanın tuş listesini taşır
 ALFABE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"            # karışan harfler yok (0/O, 1/I/L)
 KOD_UZUNLUK = 10
 KESIF, KESIF_CEVAP, TUS, HAREKET, DUGME, TEKER, NABIZ, NABIZ_CEVAP, BIRAK = range(1, 10)
@@ -133,6 +137,16 @@ def nabiz_icerigi(acik: bool, tuslar: set, dugmeler: set) -> bytes:
             + bytes([sum(1 << d for d in dugmeler) & 0x1F]))
 
 
+def tus_listesi(tuslar) -> bytes:
+    """Alanın izin verdiği tuşlar: (tarama, e0) çiftleri, en çok girdi.EN_COK_TUS."""
+    return b"".join(bytes([t, int(e)]) for t, e in sorted(tuslar)[:girdi.EN_COK_TUS])
+
+
+def tus_listesi_coz(veri: bytes) -> frozenset:
+    cift = [(veri[i], bool(veri[i + 1])) for i in range(0, len(veri) - 1, 2)][:girdi.EN_COK_TUS]
+    return frozenset(t for t in cift if girdi.izin_verilir_mi(*t))
+
+
 def nabiz_coz(icerik: bytes) -> tuple[bool, set, set]:
     n = min(icerik[1], 16)
     if len(icerik) < 3 + 2 * n:
@@ -212,7 +226,8 @@ class Alici:
             return
         if nonce != self.nonce:                        # nonce'u bilmiyor (yeni bağlanıyor ya da eski kayıt)
             if tur == NABIZ and not baska:             # nabıza nonce'la cevap ver; hiçbir girdi uygulanmaz
-                self.soket.sendto(self.paketci.paketle(NABIZ_CEVAP, oturum, self.nonce, sira, b"0"), adres)
+                self.soket.sendto(self.paketci.paketle(NABIZ_CEVAP, oturum, self.nonce, sira,
+                                                       b"0" + tus_listesi(self.basici.izinli)), adres)
             return self._reddet()
         if baska:                                      # başka bir gönderen bağlı
             return self._reddet()
@@ -228,7 +243,8 @@ class Alici:
             self.durum("baglandi", adres[0])
         if tur == NABIZ:
             self.soket.sendto(self.paketci.paketle(NABIZ_CEVAP, oturum, self.nonce, sira,
-                                                   b"1" if self.etkin else b"2"), adres)
+                                                   (b"1" if self.etkin else b"2") + tus_listesi(self.basici.izinli)),
+                              adres)
         if not self.etkin:
             self.uzak_acik = False
             self.basici.hepsini_birak()
@@ -265,6 +281,7 @@ class Gonderici:
         self.nonce = BOS_NONCE                         # alanın bu açılıştaki değeri (nabız cevabından öğrenilir)
         self.son_cevap = 0.0
         self.alan_durumu = ""                          # "1": uyguluyor, "2": alanda uygulama kapalı
+        self.alan_tuslari: frozenset = frozenset()     # alanın seçtiği tuşlar (nabız cevabından); yalnız bunlar gider
         self._kilit = threading.Lock()
         self.soket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.soket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -329,12 +346,15 @@ class Gonderici:
                 self.nonce = nonce
                 self.son_cevap = time.time()
                 self.alan_durumu = icerik[:1].decode(errors="replace")
+                self.alan_tuslari = tus_listesi_coz(icerik[1:])
 
     def bagli_mi(self) -> bool:
         return time.time() - self.son_cevap < 1.0 and self.alan_durumu in ("1", "2")
 
     # olaylar (alanın nonce'u öğrenilmeden gönderilenler alanda reddedilir; nabız hemen öğretir)
     def tus(self, tarama: int, e0: bool, basili: bool):
+        if (tarama, bool(e0)) not in self.alan_tuslari:  # alanın seçmediği tuş bu bilgisayardan çıkmaz
+            return
         self._yolla(TUS, bytes([tarama, int(e0), int(basili)]))
 
     def hareket(self, dx: int, dy: int):
@@ -350,7 +370,7 @@ class Gonderici:
         self._yolla(TEKER, struct.pack("<hB", max(-32768, min(32767, miktar)), int(yatay)))
 
     def nabiz(self, acik: bool, tuslar: set, dugmeler: set):
-        self._yolla(NABIZ, nabiz_icerigi(acik, tuslar, dugmeler))
+        self._yolla(NABIZ, nabiz_icerigi(acik, set(tuslar) & self.alan_tuslari, dugmeler))
 
     def birak(self):
         self._yolla(BIRAK)

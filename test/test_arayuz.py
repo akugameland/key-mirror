@@ -68,6 +68,35 @@ def alan_adim4():
     kontrol("alan: yansıtma kapanınca gösterge söner", app.gosterge.metin is None)
     kontrol("alan: Shift bırakıldı", not app.basici.basili_tuslar)
     kontrol("alan: sayaçta kabul var", app.alici.sayac["kabul"] >= 3)
+    kontrol("alan: tuş listesinde varsayılan 8 tuş", app.tus_listesi.size() == 8)
+
+    class SahteDinleyici:
+        def kapat(self):
+            pass
+    app._ekleyici = SahteDinleyici()                   # "Tuş ekle"ye basılmış gibi: sonra E'ye basıldı
+    app._tus_eklendi(0x12, False)
+    kontrol("alan: E eklendi (liste, ayar, basıcı)", app.tus_listesi.size() == 9
+            and [0x12, False] in app.ayar["izinli_tuslar"] and (0x12, False) in app.basici.izinli)
+    app._ekleyici = SahteDinleyici()
+    app._eklenen_f(0x3B)                               # F1: ayrılmış
+    app.kok.update()
+    kontrol("alan: F1 eklenmez", app.tus_listesi.size() == 9 and app._ekleyici is None)
+    app._ekleyici = SahteDinleyici()
+    app._tus_eklendi(0x01, False)                      # Esc: vazgeç
+    kontrol("alan: Esc vazgeçer", app.tus_listesi.size() == 9)
+    app.tus_listesi.selection_set(app._liste_sirasi.index((0x11, False)))
+    app._tus_cikar()
+    kontrol("alan: W çıkarıldı", app.tus_listesi.size() == 8 and (0x11, False) not in app.basici.izinli)
+    g.nabiz(True, set(), set())
+    app.kok.after(400, alan_adim5)
+
+
+def alan_adim5():
+    kontrol("alan: gönderen yeni listeyi aldı (E var, W yok)", (0x12, False) in g.alan_tuslari
+            and (0x11, False) not in g.alan_tuslari)
+    goruntu(app, "alan_liste.png")
+    app._tus_varsayilan()
+    kontrol("alan: varsayılana dönüldü", app.tus_listesi.size() == 8 and (0x12, False) not in app.basici.izinli)
     g.kapat()
     app.kapat()
 
@@ -104,6 +133,8 @@ def gon_adim():
     kontrol("gönderen: kapalı başlar", not app.acik and app.buyuk.cget("text") == "MIRRORING OFF")
     kontrol("gönderen: İngilizce arayüz", app.kok.title() == "Key Mirror")
     kontrol("gönderen: alan cevap veriyor", app.durum.cget("text") == "Receiver is answering")
+    kontrol("gönderen: alanın listesi yazıyor", "chosen by the receiver" in app.yansitilan.cget("text")
+            and "Left Shift" in app.yansitilan.cget("text"))
     app._tus(0x11, False, True)                       # kapalıyken basılan W gönderilmemeli
     app.kok.after(300, gon_adim2)
 

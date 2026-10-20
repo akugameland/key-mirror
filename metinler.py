@@ -3,7 +3,7 @@ import ctypes
 
 METIN = {
     "tr": {
-        "baslik": "Tuş Yansıt: iki bilgisayar arası W A S D + Shift + Ctrl + fare",
+        "baslik": "Tuş Yansıt: seçtiğin tuşlar + fare, iki bilgisayar arası",
         "dil": "Dil / Language:",
         "rol": "Bu bilgisayar:",
         "gonderen": "Gönderen (tuşlara burada basıyorum)",
@@ -40,11 +40,26 @@ METIN = {
         "yonetici": "Öndeki pencere yönetici olarak çalışıyor: tuşlar ona basılamaz. Programı da yönetici "
                     "olarak açın (BASLAT.bat → sağ tık → Yönetici olarak çalıştır).",
         "port_dolu": "Port {port} kullanımda: program iki kez mi açık?",
-        "yansitilan": "Yansıtılan: W A S D · Shift · Ctrl{fare}. Diğer tuşlar bu bilgisayardan çıkmaz.",
+        "yansitilan": "Yansıtılan (alanın seçtiği): {tuslar}{fare}. Diğer tuşlar bu bilgisayardan çıkmaz.",
+        "yansitilan_bekle": "Hangi tuşların gideceğini alan seçer; bağlanınca burada görünür. "
+                            "Listede olmayan hiçbir tuş bu bilgisayardan çıkmaz.",
         "fare_ek": " · fare",
+        "izinli": "Basılabilecek tuşlar:",
+        "izinli_aciklama": "Gönderen yalnız bu listedeki tuşları yollar, bu bilgisayar da yalnız bunları basar. "
+                           "Windows tuşu ve F1–F12 eklenemez.",
+        "tus_ekle": "Tuş ekle",
+        "tus_bekle_ekle": "Bir tuşa bas… (Esc: vazgeç)",
+        "tus_cikar": "Seçileni çıkar",
+        "tus_varsayilan": "Varsayılana dön",
+        "tus_eklendi": "Eklendi: {tus}",
+        "tus_cikarildi": "Çıkarıldı: {tus}",
+        "tus_zaten": "{tus} zaten listede",
+        "tus_sec": "Önce listeden bir tuş seç",
+        "tus_dolu": "Liste dolu (en çok {n} tuş)",
+        "tus_ayrilmis": "F1–F12 ve Scroll Lock ayrılmış (aç / kapa için), eklenemez",
     },
     "en": {
-        "baslik": "Key Mirror: W A S D + Shift + Ctrl + mouse between two PCs",
+        "baslik": "Key Mirror: the keys you choose + mouse, between two PCs",
         "dil": "Dil / Language:",
         "rol": "This PC is the:",
         "gonderen": "Sender (I press the keys here)",
@@ -81,8 +96,23 @@ METIN = {
         "yonetici": "The window in front runs as administrator: keys can't be pressed into it. Run this app as "
                     "administrator too (BASLAT.bat → right-click → Run as administrator).",
         "port_dolu": "Port {port} is in use: is the app open twice?",
-        "yansitilan": "Mirrored: W A S D · Shift · Ctrl{fare}. Other keys never leave this PC.",
+        "yansitilan": "Mirrored (chosen by the receiver): {tuslar}{fare}. Other keys never leave this PC.",
+        "yansitilan_bekle": "The receiver chooses which keys are sent; they show here once connected. "
+                            "No key outside that list leaves this PC.",
         "fare_ek": " · mouse",
+        "izinli": "Keys it may press:",
+        "izinli_aciklama": "The sender only sends keys on this list, and this PC only presses these. "
+                           "The Windows key and F1–F12 can't be added.",
+        "tus_ekle": "Add key",
+        "tus_bekle_ekle": "Press a key… (Esc: cancel)",
+        "tus_cikar": "Remove selected",
+        "tus_varsayilan": "Reset to default",
+        "tus_eklendi": "Added: {tus}",
+        "tus_cikarildi": "Removed: {tus}",
+        "tus_zaten": "{tus} is already on the list",
+        "tus_sec": "Select a key on the list first",
+        "tus_dolu": "The list is full (at most {n} keys)",
+        "tus_ayrilmis": "F1–F12 and Scroll Lock are reserved (on / off), they can't be added",
     },
 }
 DIL_ADLARI = {"tr": "Türkçe", "en": "English"}

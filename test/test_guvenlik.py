@@ -67,15 +67,22 @@ time.sleep(0.2)
 kontrol("nonce öğrenilmeden tuş basılmaz", not basici.basili_tuslar)
 g.nabiz(False, set(), set())
 kontrol("nabız cevabıyla nonce öğrenilir", bekle(lambda: g.nonce == alici.nonce))
+kontrol("nabız cevabıyla alanın tuş listesi öğrenilir (varsayılan)", bekle(lambda: g.alan_tuslari == set(girdi.TUSLAR)))
 # 2) normal akış
 g.nabiz(True, set(), set())
 g.tus(0x11, False, True)
 kontrol("W basıldı", bekle(lambda: (0x11, False) in basici.basili_tuslar))
 g.tus(0x11, False, False)
 kontrol("W bırakıldı", bekle(lambda: not basici.basili_tuslar))
-# 3) beyaz liste: Enter (0x1C) ve Windows tuşu gönderilse bile basılmaz
-g.tus(0x1C, False, True)
-g.tus(0x5B, True, True)
+# 3) beyaz liste: gönderen listede olmayanı hiç yollamaz; elle uydurulan paket gelse de alan basmaz
+n_kabul = alici.sayac["kabul"]
+g.tus(0x1C, False, True)                               # Enter: alanın listesinde yok
+time.sleep(0.2)
+kontrol("gönderen listede olmayan tuşu yollamaz", alici.sayac["kabul"] == n_kabul and not basici.basili_tuslar)
+for tarama, e0 in ((0x1C, False), (0x5B, True)):       # filtreyi atlayıp doğrudan paket: Enter, Windows tuşu
+    g.sira += 1
+    s0 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s0.sendto(g.paketci.paketle(ag.TUS, g.oturum, g.nonce, g.sira, bytes([tarama, int(e0), 1])), ("127.0.0.1", PORT))
 time.sleep(0.2)
 kontrol("izin verilmeyen tuşlar basılmaz", not basici.basili_tuslar)
 # 4) tekrar gönderme: aynı paket ikinci kez uygulanmaz
@@ -134,6 +141,40 @@ g.dugme(3, False)
 kontrol("fare olayları uygulanır", bekle(lambda: len(basici.olaylar) >= n + 4))
 mi = basici.olaylar[n][0].u.mi
 kontrol("fare hareketi doğru (40, -15)", (mi.dx, mi.dy) == (40, -15))
+# 12b) alanın tuş listesi: W çıkar, E eklenir; Windows tuşu hiç eklenemez
+basici.izinli_ayarla((set(girdi.TUSLAR) - {(0x11, False)}) | {(0x12, False), (0x5B, True), (0x3B, False)})
+kontrol("Windows tuşu ve F1 listeye giremez", (0x5B, True) not in basici.izinli and (0x3B, False) not in basici.izinli)
+g.nabiz(True, set(), set())
+kontrol("gönderen yeni listeyi öğrenir", bekle(lambda: (0x12, False) in g.alan_tuslari
+                                                and (0x11, False) not in g.alan_tuslari))
+g.tus(0x12, False, True)
+kontrol("eklenen E basılır", bekle(lambda: (0x12, False) in basici.basili_tuslar))
+g.tus(0x11, False, True)
+time.sleep(0.2)
+kontrol("çıkarılan W basılmaz", (0x11, False) not in basici.basili_tuslar)
+basici.izinli_ayarla(set(girdi.TUSLAR))                # E listeden çıkınca basılıysa bırakılır
+kontrol("listeden çıkan basılı tuş bırakılır", (0x12, False) not in basici.basili_tuslar)
+g.tus(0x12, False, False)
+g.nabiz(True, set(), set())
+bekle(lambda: g.alan_tuslari == set(girdi.TUSLAR))
+# 12c) fare düğmesi yakalama: Windows RAWMOUSE düzeni (2026-10-21 tık hatası)
+import ctypes  # noqa: E402
+kontrol("RAWMOUSE düğme bayrakları doğru konumda (4, 6)", girdi.RAWMOUSE.usButtonFlags.offset == 4
+        and girdi.RAWMOUSE.usButtonData.offset == 6 and girdi.RAWMOUSE.lLastX.offset == 12
+        and ctypes.sizeof(girdi.RAWMOUSE) == 24)
+yak = girdi.Yakalayici.__new__(girdi.Yakalayici)
+yakalanan = []
+yak._dugme = lambda no, b: yakalanan.append(("d", no, b))
+yak._teker = lambda m, y: yakalanan.append(("t", m, y))
+yak._hareket = lambda dx, dy: yakalanan.append(("h", dx, dy))
+ham = bytearray(24)
+struct.pack_into("<HHHH", ham, 0, 0, 0, 0x0001 | 0x0008, 0)      # sol bas + sağ bırak (Windows düzeninde)
+yak._fare(girdi.RAWMOUSE.from_buffer_copy(bytes(ham)))
+kontrol("sol tık basışı ve sağ tık bırakışı okunur", ("d", 0, True) in yakalanan and ("d", 1, False) in yakalanan)
+ham = bytearray(24)
+struct.pack_into("<HHHh", ham, 0, 0, 0, 0x0400, -120)             # tekerlek aşağı
+yak._fare(girdi.RAWMOUSE.from_buffer_copy(bytes(ham)))
+kontrol("tekerlek okunur (-120)", ("t", -120, False) in yakalanan)
 # 13) bulma: yalnız aynı kodu bilen alan cevap verir
 time.sleep(ag.TEK_GONDEREN_SN + 0.2)
 yabanci = ag.Gonderici(ag.yeni_kod())
