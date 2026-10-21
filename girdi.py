@@ -6,6 +6,7 @@ hiçbir tuşu ya da fare hareketini bekletmez ve engellemez (CanYouSpeak fare.py
 (enjekte) girdiler hDevice = 0 ile gelir ve atlanır: iki program aynı bilgisayarda çalışsa da döngü olmaz.
 
 Hangi tuşların yansıtılacağını ALAN seçer (kendi klavyesinden ekler / çıkarır; varsayılan: W A S D, Shift, Ctrl).
+Farede de ALAN seçer: sol / sağ / orta / yan tıklar, tekerlek (kaydırma) ve hareket ayrı ayrı açılıp kapanır (FARE_*).
 Alan listesini nabız cevabıyla gönderene bildirir. Gönderen yalnız o listedeki tuşları gönderir; alan da listesinde
 olmayan tuşu basmaz (iki taraflı beyaz liste). YASAK listesindeki tuşlar (Windows, menü, F1-F12 / Scroll Lock)
 hiçbir zaman seçilemez ve yansıtılmaz.
@@ -26,6 +27,10 @@ TUSLAR = {
 EN_COK_TUS = 60                                       # alanın listesi en çok bu kadar tuş (paket boyu sınırı)
 # Fare düğmeleri: 0 sol, 1 sağ, 2 orta, 3 yan1 (geri), 4 yan2 (ileri)
 DUGME_ADLARI = ["Sol tık", "Sağ tık", "Orta tık", "Yan tuş 1", "Yan tuş 2"]
+# Alanın fare izni (bit maskesi): bit 0-4 düğmeler (yukarıdaki sırayla), 5 tekerlek, 6 hareket
+FARE_TEKER, FARE_HAREKET = 5, 6
+FARE_HEPSI = 0x7F                                     # varsayılan: hepsi açık (önceki sürümlerle aynı davranış)
+FARE_SIRASI = (0, 1, 2, 3, 4, FARE_TEKER, FARE_HAREKET)
 
 # Tarama kodu -> ad (açma/kapama tuşu seçimi için; yansıtılmaz)
 F_TUSLARI = {0x3B: "F1", 0x3C: "F2", 0x3D: "F3", 0x3E: "F4", 0x3F: "F5", 0x40: "F6", 0x41: "F7", 0x42: "F8",
@@ -275,12 +280,22 @@ def _gonder(*girdiler: INPUT) -> bool:
 class Basici:
     """Alan tarafı. Basılı tuş ve düğmeleri izler: bağlantı koparsa hepsi bırakılabilsin."""
 
-    def __init__(self, izinli=None):
+    def __init__(self, izinli=None, fare_izni: int = FARE_HEPSI):
         self.basili_tuslar: set[tuple[int, bool]] = set()
         self.basili_dugmeler: set[int] = set()
         self._kilit = threading.Lock()
         self.izinli: frozenset = frozenset(TUSLAR)
+        self.fare_izni = FARE_HEPSI
         self.izinli_ayarla(TUSLAR if izinli is None else izinli)
+        self.fare_izni_ayarla(fare_izni)
+
+    def fare_izni_ayarla(self, maske: int) -> int:
+        """Alanın fare seçimi (bit maskesi). Kapatılan ama basılı olan düğme bırakılır."""
+        self.fare_izni = int(maske) & FARE_HEPSI
+        for no in list(self.basili_dugmeler):
+            if not self.fare_izni >> no & 1:
+                self.fare_dugme(no, False)
+        return self.fare_izni
 
     def izinli_ayarla(self, tuslar) -> frozenset:
         """Alanın seçtiği liste (YASAK olanlar ve fazlası atılır). Listeden çıkan ama basılı olan tuş bırakılır."""
@@ -305,12 +320,17 @@ class Basici:
             return _gonder(g)
 
     def fare_hareket(self, dx: int, dy: int) -> bool:
+        if not self.fare_izni >> FARE_HAREKET & 1:     # alan fare hareketini kapattı
+            return False
         g = INPUT(type=INPUT_MOUSE)
         g.u.mi = MOUSEINPUT(dx, dy, 0, MOUSEEVENTF_MOVE, 0, 0)
         return _gonder(g)
 
     def fare_dugme(self, no: int, basili: bool) -> bool:
         if no not in _DUGME_GIRDI:
+            return False
+        if basili and not self.fare_izni >> no & 1:    # alan bu düğmeyi kapattı (bırakmak hep serbest)
+            log.warning("izin verilmeyen fare düğmesi geldi, basılmadı: %s", no)
             return False
         with self._kilit:
             if not basili and no not in self.basili_dugmeler:
@@ -322,6 +342,8 @@ class Basici:
             return _gonder(g)
 
     def teker(self, miktar: int, yatay: bool) -> bool:
+        if not self.fare_izni >> FARE_TEKER & 1:       # alan tekerleği (kaydırmayı) kapattı
+            return False
         g = INPUT(type=INPUT_MOUSE)
         g.u.mi = MOUSEINPUT(0, 0, ctypes.c_uint32(miktar).value, MOUSEEVENTF_HWHEEL if yatay else MOUSEEVENTF_WHEEL,
                             0, 0)

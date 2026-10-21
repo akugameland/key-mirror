@@ -68,6 +68,7 @@ kontrol("nonce öğrenilmeden tuş basılmaz", not basici.basili_tuslar)
 g.nabiz(False, set(), set())
 kontrol("nabız cevabıyla nonce öğrenilir", bekle(lambda: g.nonce == alici.nonce))
 kontrol("nabız cevabıyla alanın tuş listesi öğrenilir (varsayılan)", bekle(lambda: g.alan_tuslari == set(girdi.TUSLAR)))
+kontrol("nabız cevabıyla alanın fare izni öğrenilir (varsayılan: hepsi)", g.alan_fare == girdi.FARE_HEPSI)
 # 2) normal akış
 g.nabiz(True, set(), set())
 g.tus(0x11, False, True)
@@ -175,6 +176,33 @@ ham = bytearray(24)
 struct.pack_into("<HHHh", ham, 0, 0, 0, 0x0400, -120)             # tekerlek aşağı
 yak._fare(girdi.RAWMOUSE.from_buffer_copy(bytes(ham)))
 kontrol("tekerlek okunur (-120)", ("t", -120, False) in yakalanan)
+# 12d) alanın fare izni: sağ tık, tekerlek ve hareket kapalı; sol tık açık
+kapali = girdi.FARE_HEPSI & ~(1 << 1) & ~(1 << girdi.FARE_TEKER) & ~(1 << girdi.FARE_HAREKET)
+basici.fare_izni_ayarla(kapali)
+g.nabiz(True, set(), set())
+kontrol("gönderen yeni fare iznini öğrenir", bekle(lambda: g.alan_fare == kapali))
+n_kabul = alici.sayac["kabul"]
+g.dugme(1, True)
+g.teker(-120, False)
+g.hareket(30, 30)
+time.sleep(0.2)
+kontrol("gönderen kapalı sağ tık / tekerlek / hareketi hiç yollamaz", alici.sayac["kabul"] == n_kabul)
+n = len(basici.olaylar)
+for tur, icerik in ((ag.DUGME, bytes([1, 1])), (ag.TEKER, struct.pack("<hB", -120, 0)),
+                    (ag.HAREKET, struct.pack("<hh", 30, 30))):       # filtreyi atlayıp doğrudan paket
+    g.sira += 1
+    s.sendto(g.paketci.paketle(tur, g.oturum, g.nonce, g.sira, icerik), ("127.0.0.1", PORT))
+time.sleep(0.3)
+kontrol("alan kapalı sağ tık / tekerlek / hareketi uygulamaz", len(basici.olaylar) == n
+        and 1 not in basici.basili_dugmeler)
+g.dugme(0, True)
+kontrol("açık olan sol tık uygulanır", bekle(lambda: 0 in basici.basili_dugmeler))
+basici.fare_izni_ayarla(kapali & ~1)                  # basılıyken sol tık kapatılınca bırakılır
+kontrol("kapatılan basılı düğme bırakılır", not basici.basili_dugmeler)
+basici.fare_izni_ayarla(girdi.FARE_HEPSI)
+g.dugme(0, False)
+g.nabiz(True, set(), set())
+bekle(lambda: g.alan_fare == girdi.FARE_HEPSI)
 # 13) bulma: yalnız aynı kodu bilen alan cevap verir
 time.sleep(ag.TEK_GONDEREN_SN + 0.2)
 yabanci = ag.Gonderici(ag.yeni_kod())

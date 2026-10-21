@@ -9,9 +9,12 @@ network at the same time. **The receiver chooses which keys** (default: W A S D,
 - **Choose the keys on the receiver:** press **Add key**, then press the key on the receiver's own keyboard.
   Select a key and press **Remove selected** to take it off, or **Reset to default**. The Windows key, the menu key
   and F1–F12 / Scroll Lock can never be added.
+- **Choose the mouse on the receiver:** tick or untick left click, right click, middle click, side buttons 1 and 2,
+  wheel (scroll) and movement one by one. The sender never sends what the receiver has turned off.
 - Mirroring starts **off**; toggle it with **F7** (changeable to F1–F12 / Scroll Lock). While it is on, a red
   `● MIRRORING ON` label stays in the top-left corner of the sender, and `● REMOTE INPUT` on the receiver.
-- Mouse: movement, left/right/middle/side buttons and wheel (can be turned off).
+- Mouse: movement, left/right/middle/side buttons and wheel; each one can be turned off on the receiver, and the
+  whole mouse can be turned off on the sender.
 - Turkish and English interface. Python standard library only: no third-party packages.
 
 ## Security
@@ -61,7 +64,7 @@ the receiver shows a red warning and you can start it as administrator (right-cl
 
 ## Updating
 
-Version 3 of the network protocol (receiver-chosen keys) does not talk to older copies: update **both** PCs.
+Version 4 of the network protocol (receiver-chosen keys and mouse) does not talk to older copies: update **both** PCs.
 This update also fixes left / right / middle / side clicks and the wheel, which were not picked up on the sender.
 
 ## License
@@ -79,9 +82,12 @@ anda basılır. **Hangi tuşların gideceğini alan seçer** (varsayılan: W A S
 - **Tuşları alanda seç:** **Tuş ekle**'ye bas, sonra alanın kendi klavyesinde o tuşa bas. Çıkarmak için listeden seçip
   **Seçileni çıkar**, baştaki listeye dönmek için **Varsayılana dön**. Windows tuşu, menü tuşu ve F1–F12 / Scroll Lock
   hiçbir zaman eklenemez.
+- **Fareyi alanda seç:** sol tık, sağ tık, orta tık, yan tuş 1 ve 2, tekerlek (kaydırma) ve hareket kutularını tek tek
+  işaretle ya da kaldır. Alanın kapattığını gönderen hiç yollamaz.
 - Yansıtma **kapalı** başlar; **F7** ile açılıp kapanır (F1–F12 ya da Scroll Lock yapılabilir). Açıkken gönderende
   sol üstte kırmızı `● YANSITMA AÇIK`, alanda `● UZAKTAN GİRDİ` yazısı durur.
-- Fare: hareket, sol/sağ/orta/yan tuşlar ve tekerlek (kapatılabilir).
+- Fare: hareket, sol/sağ/orta/yan tuşlar ve tekerlek; her biri alanda ayrı kapatılabilir, gönderende de farenin
+  tamamı kapatılabilir.
 - Türkçe ve İngilizce arayüz. Yalnız Python standart kütüphanesi, ek paket yok.
 
 **Güvenlik:**
@@ -102,7 +108,7 @@ anda basılır. **Hangi tuşların gideceğini alan seçer** (varsayılan: W A S
 anda yönetmek (multiboxing) birçok oyunun kurallarına aykırıdır ve hesabın kapatılmasına yol açabilir. Hile korumaları
 programla basılan tuşları yok sayabilir. Kullanmadan önce oyununun kurallarına bak; sorumluluk kullanıcıdadır.
 
-**Güncelleme:** Bu sürümün ağ protokolü (sürüm 3) eski kopyalarla konuşmaz; **iki bilgisayarı da** güncelle. Bu sürüm
+**Güncelleme:** Bu sürümün ağ protokolü (sürüm 4) eski kopyalarla konuşmaz; **iki bilgisayarı da** güncelle. Bu sürüm
 gönderende hiç algılanmayan sol / sağ / orta / yan tıkları ve tekerleği de düzeltir.
 
 **Kurulum:** Depoyu **iki bilgisayara da** indir (Code → Download ZIP), klasöre çıkar, `BASLAT.bat`'a çift tıkla.

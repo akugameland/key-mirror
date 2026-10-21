@@ -9,7 +9,8 @@ NE YAPAR?
 GÜNCELLEME (2026-10-21)
 - Alan, basılabilecek tuşları kendi klavyesinden seçer (ekle / çıkar).
 - Sol / sağ / orta / yan tık ve tekerlek artık çalışıyor (gönderen önceden bunları hiç algılamıyordu).
-- Ağ protokolü değişti (sürüm 3): İKİ BİLGİSAYARI DA güncelle, yoksa birbirini görmez.
+- Alan, farede neyin basılabileceğini de seçer: sol / sağ / orta tık, yan tuşlar, tekerlek (kaydırma), hareket.
+- Ağ protokolü değişti (sürüm 4): İKİ BİLGİSAYARI DA güncelle, yoksa birbirini görmez.
 
 KURULUM (iki bilgisayarda da)
 1) Klasörü bilgisayara kopyala (ya da GitHub'dan Code → Download ZIP ile indirip çıkar).
@@ -33,6 +34,12 @@ TUŞ SEÇME (alanda)
 - Listeden bir tuşu seçip "Seçileni çıkar" ile kaldır. "Varsayılana dön" W A S D, Shift, Ctrl'e döndürür.
 - Windows tuşu, menü tuşu, F1–F12 ve Scroll Lock eklenemez (F tuşları yansıtmayı açıp kapamak için ayrılmış).
 - Liste ayarlar.json'a kaydedilir; gönderen yeni listeyi bir saniye içinde öğrenir ve penceresinde gösterir.
+
+FARE SEÇME (alanda)
+- "Fare" satırındaki kutular: Sol tık, Sağ tık, Orta tık, Yan tuş 1, Yan tuş 2, Tekerlek (kaydırma), Hareket.
+- İşaretli olan uygulanır, işareti kaldırılan uygulanmaz. Gönderen kapalı olanları hiç yollamaz.
+- Örnek: yalnız tekerleği kullanmak istersen diğer kutuların işaretini kaldır, yalnız "Tekerlek" işaretli kalsın.
+- Basılıyken kapatılan düğme hemen bırakılır.
 
 GÜVENLİK
 - İki taraflı beyaz liste, alan seçer: gönderen yalnız alanın listesindeki tuşları ve fareyi yollar; listede
@@ -67,5 +74,5 @@ ag.py          şifreli, imzalı UDP protokolü (port 47810)
 girdi.py       yakalama (Raw Input) ve basma (SendInput), alanın tuş listesi, yasak tuşlar
 yetki.py       öndeki pencere yönetici mi
 metinler.py    Türkçe / English metinler
-test\          test_guvenlik.py (37 güvenlik/protokol testi), test_gercek.py, test_arayuz.py,
+test\          test_guvenlik.py (43 güvenlik/protokol testi), test_gercek.py, test_arayuz.py,
                test_tik.py (gerçek sol / sağ tık; yalnız kendi test penceresine tıklar)

@@ -14,6 +14,8 @@ Güvenlik (kullanıcı isteği 2026-10-17: "güvenli yap, riske atma"):
 - Hangi tuşların basılabileceğini ALAN seçer (girdi.Basici.izinli). Liste nabız cevabıyla (şifreli, imzalı)
   gönderene bildirilir; gönderen yalnız o tuşları yollar, alan listesinde olmayanı basmaz.
   Windows / menü tuşu ve F1-F12 hiçbir zaman listeye giremez (girdi.YASAK).
+- Farede de ALAN seçer (girdi.Basici.fare_izni: düğmeler, tekerlek, hareket); seçim aynı cevapla gider ve
+  gönderen kapalı olanı hiç yollamaz.
 
 Paket: b"TY" | sürüm(1) | tür(1) | oturum(8) | alan_nonce(8) | sıra(8) | şifreli içerik | imza(16)
 
@@ -36,7 +38,7 @@ import girdi
 log = logging.getLogger("ag")
 
 PORT = 47810
-SURUM = 3                                             # 3: nabız cevabı alanın tuş listesini taşır
+SURUM = 4                                             # 3: nabız cevabında tuş listesi; 4: + fare izni
 ALFABE = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"            # karışan harfler yok (0/O, 1/I/L)
 KOD_UZUNLUK = 10
 KESIF, KESIF_CEVAP, TUS, HAREKET, DUGME, TEKER, NABIZ, NABIZ_CEVAP, BIRAK = range(1, 10)
@@ -210,6 +212,10 @@ class Alici:
     def _reddet(self):
         self.sayac["red"] += 1
 
+    def _izinler(self) -> bytes:
+        """Nabız cevabı içeriği (durum baytından sonra): fare izni (1 bayt) + tuş listesi."""
+        return bytes([self.basici.fare_izni & girdi.FARE_HEPSI]) + tus_listesi(self.basici.izinli)
+
     def _isle(self, veri: bytes, adres):
         if not ozel_adres_mi(adres[0]):                # internetten gelen: asla
             return self._reddet()
@@ -227,7 +233,7 @@ class Alici:
         if nonce != self.nonce:                        # nonce'u bilmiyor (yeni bağlanıyor ya da eski kayıt)
             if tur == NABIZ and not baska:             # nabıza nonce'la cevap ver; hiçbir girdi uygulanmaz
                 self.soket.sendto(self.paketci.paketle(NABIZ_CEVAP, oturum, self.nonce, sira,
-                                                       b"0" + tus_listesi(self.basici.izinli)), adres)
+                                                       b"0" + self._izinler()), adres)
             return self._reddet()
         if baska:                                      # başka bir gönderen bağlı
             return self._reddet()
@@ -243,7 +249,7 @@ class Alici:
             self.durum("baglandi", adres[0])
         if tur == NABIZ:
             self.soket.sendto(self.paketci.paketle(NABIZ_CEVAP, oturum, self.nonce, sira,
-                                                   (b"1" if self.etkin else b"2") + tus_listesi(self.basici.izinli)),
+                                                   (b"1" if self.etkin else b"2") + self._izinler()),
                               adres)
         if not self.etkin:
             self.uzak_acik = False
@@ -282,6 +288,7 @@ class Gonderici:
         self.son_cevap = 0.0
         self.alan_durumu = ""                          # "1": uyguluyor, "2": alanda uygulama kapalı
         self.alan_tuslari: frozenset = frozenset()     # alanın seçtiği tuşlar (nabız cevabından); yalnız bunlar gider
+        self.alan_fare = 0                             # alanın fare izni (bit maskesi, girdi.FARE_*); kapalı olan gitmez
         self._kilit = threading.Lock()
         self.soket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.soket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -346,7 +353,8 @@ class Gonderici:
                 self.nonce = nonce
                 self.son_cevap = time.time()
                 self.alan_durumu = icerik[:1].decode(errors="replace")
-                self.alan_tuslari = tus_listesi_coz(icerik[1:])
+                self.alan_fare = icerik[1] & girdi.FARE_HEPSI if len(icerik) > 1 else 0
+                self.alan_tuslari = tus_listesi_coz(icerik[2:])
 
     def bagli_mi(self) -> bool:
         return time.time() - self.son_cevap < 1.0 and self.alan_durumu in ("1", "2")
@@ -357,20 +365,30 @@ class Gonderici:
             return
         self._yolla(TUS, bytes([tarama, int(e0), int(basili)]))
 
+    def fare_izinli(self, bit: int) -> bool:
+        return bool(self.alan_fare >> bit & 1)
+
     def hareket(self, dx: int, dy: int):
+        if not self.fare_izinli(girdi.FARE_HAREKET):
+            return
         while dx or dy:                                # çok büyük sıçrama: parçalara böl
             px, py = max(-32767, min(32767, dx)), max(-32767, min(32767, dy))
             self._yolla(HAREKET, struct.pack("<hh", px, py))
             dx, dy = dx - px, dy - py
 
     def dugme(self, no: int, basili: bool):
+        if not 0 <= no <= 4 or not self.fare_izinli(no):
+            return
         self._yolla(DUGME, bytes([no, int(basili)]))
 
     def teker(self, miktar: int, yatay: bool):
+        if not self.fare_izinli(girdi.FARE_TEKER):
+            return
         self._yolla(TEKER, struct.pack("<hB", max(-32768, min(32767, miktar)), int(yatay)))
 
     def nabiz(self, acik: bool, tuslar: set, dugmeler: set):
-        self._yolla(NABIZ, nabiz_icerigi(acik, set(tuslar) & self.alan_tuslari, dugmeler))
+        self._yolla(NABIZ, nabiz_icerigi(acik, set(tuslar) & self.alan_tuslari,
+                                         {d for d in dugmeler if 0 <= d <= 4 and self.fare_izinli(d)}))
 
     def birak(self):
         self._yolla(BIRAK)

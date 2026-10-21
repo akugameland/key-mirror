@@ -39,7 +39,7 @@ import yetki  # noqa: E402
 from metinler import DIL_ADLARI, t, varsayilan_dil  # noqa: E402
 
 VARSAYILAN = {"dil": "", "rol": "gonderen", "kod": "", "hedef_kod": "", "hedef_ip": "", "ac_kapa": 0x41,
-              "fare": True, "izinli_tuslar": [[t, e] for t, e in sorted(girdi.TUSLAR)]}
+              "fare": True, "izinli_tuslar": [[t, e] for t, e in sorted(girdi.TUSLAR)], "fare_izni": girdi.FARE_HEPSI}
 KIRMIZI, YESIL, SARI, GRI, MAVI = "#ff5a5a", "#4dff6a", "#ffd84a", "#bdbdbd", "#8fd0ff"
 ARKA, ON, KUTU = "#1e1f24", "#e8e8e8", "#2b2d34"
 ANAHTAR_RENK = "#010203"
@@ -66,6 +66,9 @@ def ayar_yukle() -> dict:
                               if girdi.izin_verilir_mi(int(t), bool(e))][:girdi.EN_COK_TUS]
     except (TypeError, ValueError):
         a["izinli_tuslar"] = list(VARSAYILAN["izinli_tuslar"])
+    if not isinstance(a["fare_izni"], int) or isinstance(a["fare_izni"], bool):
+        a["fare_izni"] = girdi.FARE_HEPSI
+    a["fare_izni"] &= girdi.FARE_HEPSI
     return a
 
 
@@ -105,7 +108,7 @@ class Uygulama:
         self.ayar = ayar_yukle()
         self._kaydet()
         self.kok = tk.Tk()
-        self.kok.geometry("620x720")
+        self.kok.geometry("620x800")
         self.kok.configure(bg=ARKA)
         self.kok.protocol("WM_DELETE_WINDOW", self.kapat)
         self.kok.report_callback_exception = lambda *a: logging.error("arayüz hatası", exc_info=a)
@@ -125,7 +128,7 @@ class Uygulama:
         self._bildir("", GRI)
         # alan durumu
         self.alici = None
-        self.basici = girdi.Basici(self.ayar["izinli_tuslar"])
+        self.basici = girdi.Basici(self.ayar["izinli_tuslar"], self.ayar["fare_izni"])
         self._ekleyici = None                          # alanda "tuş ekle" beklerken geçici klavye dinleyici
         self._engel = False
         self._calisiyor = True
@@ -165,7 +168,8 @@ class Uygulama:
         self._bildir("", GRI)
         if self.ayar["rol"] == "alan":
             try:
-                self.alici = ag.Alici(self.ayar["kod"], self.basici, socket.gethostname(), self._alan_olayi)
+                self.alici = ag.Alici(self.ayar["kod"], self.basici, socket.gethostname(), self._alan_olayi,
+                                      port=ag.PORT)
             except OSError:
                 logging.exception("alıcı açılamadı")
                 self._bildir(self.m("port_dolu", port=ag.PORT), KIRMIZI)
@@ -257,6 +261,17 @@ class Uygulama:
         tk.Label(c, text=self.m("izinli_aciklama"), bg=ARKA, fg=GRI, font=("Segoe UI", 8), wraplength=420,
                  justify="left").grid(row=7, column=1, sticky="w")
         self._listeyi_yaz()
+        # Fare: alan her düğmeyi, tekerleği (kaydırma) ve hareketi ayrı ayrı açar / kapatır
+        etiket(self.m("fare_izni"), 8)
+        fare = tk.Frame(c, bg=ARKA)
+        fare.grid(row=8, column=1, sticky="w", pady=(6, 0))
+        self.fare_kutulari = {}
+        for i, bit in enumerate(girdi.FARE_SIRASI):
+            v = tk.BooleanVar(value=bool(self.ayar["fare_izni"] >> bit & 1))
+            self.fare_kutulari[bit] = v
+            tk.Checkbutton(fare, text=self.m(f"fare_{bit}"), variable=v, command=self._fare_izni_degisti, bg=ARKA,
+                           fg=ON, selectcolor=KUTU, activebackground=ARKA, activeforeground=ON).grid(
+                row=i // 3, column=i % 3, sticky="w", padx=(0, 10))
         self.sayac = tk.Label(k, bg=ARKA, fg=GRI, font=("Segoe UI", 9))
         self.sayac.pack(anchor="w", pady=(8, 0))
 
@@ -374,6 +389,12 @@ class Uygulama:
     def _tus_varsayilan(self):
         self._ekleme_bitir()
         self._liste_kaydet(set(girdi.TUSLAR))
+
+    def _fare_izni_degisti(self):
+        maske = sum(1 << bit for bit, v in self.fare_kutulari.items() if v.get())
+        self.ayar["fare_izni"] = self.basici.fare_izni_ayarla(maske)
+        self._kaydet()
+        logging.info("alanın fare izni: %#x", self.ayar["fare_izni"])
 
     def _uygula_degisti(self):
         if self.alici:
@@ -511,14 +532,16 @@ class Uygulama:
                               fg=KIRMIZI if self.acik else GRI)
             self.aciklama.config(text=self.m("acik_aciklama" if self.acik else "kapali_aciklama", tus=tus))
             g = self.gonderici
-            fare = self.m("fare_ek") if self.ayar["fare"] else ""
-            if g and g.bagli_mi() and g.alan_tuslari:
-                anahtar = (g.alan_tuslari, self.ayar["dil"])
+            if g and g.bagli_mi() and (g.alan_tuslari or g.alan_fare):
+                anahtar = (g.alan_tuslari, g.alan_fare, self.ayar["fare"], self.ayar["dil"])
                 if getattr(self, "_ad_onbellek", (None, ""))[0] != anahtar:
                     adlar = sorted((girdi.tus_adi(t, e, self.ayar["dil"]) for t, e in g.alan_tuslari),
                                    key=lambda a: (len(a) > 1, a.lower()))
-                    self._ad_onbellek = (anahtar, ", ".join(adlar))
-                self.yansitilan.config(text=self.m("yansitilan", tuslar=self._ad_onbellek[1], fare=fare))
+                    fareler = [self.m(f"fare_{b}") for b in girdi.FARE_SIRASI if g.fare_izinli(b)]
+                    fare = (self.m("fare_ek", liste=", ".join(fareler)) if fareler and self.ayar["fare"] else "")
+                    self._ad_onbellek = (anahtar, ", ".join(adlar) or "-", fare)
+                self.yansitilan.config(text=self.m("yansitilan", tuslar=self._ad_onbellek[1],
+                                                   fare=self._ad_onbellek[2]))
             else:
                 self.yansitilan.config(text=self.m("yansitilan_bekle"))
             metin, renk = "", GRI

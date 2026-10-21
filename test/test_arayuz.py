@@ -10,6 +10,7 @@ import tus_yansit  # noqa: E402
 import ag  # noqa: E402
 import girdi  # noqa: E402
 
+ag.PORT = 47897                                         # gerçek program açıksa onun portuna (47810) dokunma
 GECICI = Path(tempfile.mkdtemp())
 tus_yansit.AYAR_DOSYASI = GECICI / "ayarlar.json"      # kullanıcının ayarlarına dokunma
 cikti = Path(sys.argv[1]) if len(sys.argv) > 1 else None
@@ -87,6 +88,14 @@ def alan_adim4():
     app.tus_listesi.selection_set(app._liste_sirasi.index((0x11, False)))
     app._tus_cikar()
     kontrol("alan: W çıkarıldı", app.tus_listesi.size() == 8 and (0x11, False) not in app.basici.izinli)
+    kontrol("alan: fare kutuları varsayılanda hepsi açık", all(v.get() for v in app.fare_kutulari.values())
+            and app.basici.fare_izni == girdi.FARE_HEPSI)
+    app.fare_kutulari[1].set(False)                    # sağ tık kapalı
+    app.fare_kutulari[girdi.FARE_TEKER].set(False)     # tekerlek (kaydırma) kapalı
+    app._fare_izni_degisti()
+    beklenen = girdi.FARE_HEPSI & ~(1 << 1) & ~(1 << girdi.FARE_TEKER)
+    kontrol("alan: sağ tık ve tekerlek kapatıldı (ayar + basıcı)", app.ayar["fare_izni"] == beklenen
+            and app.basici.fare_izni == beklenen)
     g.nabiz(True, set(), set())
     app.kok.after(400, alan_adim5)
 
@@ -94,6 +103,8 @@ def alan_adim4():
 def alan_adim5():
     kontrol("alan: gönderen yeni listeyi aldı (E var, W yok)", (0x12, False) in g.alan_tuslari
             and (0x11, False) not in g.alan_tuslari)
+    kontrol("alan: gönderen fare iznini aldı (sağ tık ve tekerlek yok)", g.fare_izinli(0)
+            and not g.fare_izinli(1) and not g.fare_izinli(girdi.FARE_TEKER) and g.fare_izinli(girdi.FARE_HAREKET))
     goruntu(app, "alan_liste.png")
     app._tus_varsayilan()
     kontrol("alan: varsayılana dönüldü", app.tus_listesi.size() == 8 and (0x12, False) not in app.basici.izinli)
@@ -121,7 +132,7 @@ class SahteBasici(girdi.Basici):
 
 
 kod2 = ag.yeni_kod()
-alici = ag.Alici(kod2, SahteBasici(), "test-alan")
+alici = ag.Alici(kod2, SahteBasici(), "test-alan", port=ag.PORT)
 tus_yansit.AYAR_DOSYASI.write_text(
     '{"rol": "gonderen", "dil": "en", "hedef_kod": "%s", "hedef_ip": "127.0.0.1"}' % kod2, encoding="utf-8")
 app = tus_yansit.Uygulama()
@@ -134,7 +145,8 @@ def gon_adim():
     kontrol("gönderen: İngilizce arayüz", app.kok.title() == "Key Mirror")
     kontrol("gönderen: alan cevap veriyor", app.durum.cget("text") == "Receiver is answering")
     kontrol("gönderen: alanın listesi yazıyor", "chosen by the receiver" in app.yansitilan.cget("text")
-            and "Left Shift" in app.yansitilan.cget("text"))
+            and "Left Shift" in app.yansitilan.cget("text") and "Right click" in app.yansitilan.cget("text")
+            and "Wheel (scroll)" in app.yansitilan.cget("text"))
     app._tus(0x11, False, True)                       # kapalıyken basılan W gönderilmemeli
     app.kok.after(300, gon_adim2)
 

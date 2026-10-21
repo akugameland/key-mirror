@@ -27,7 +27,7 @@ METIN = {
         "ac_kapa": "Aç / kapa tuşu:",
         "tus_degistir": "{tus}  (değiştirmek için tıkla)",
         "tus_bekle": "F1–F12 ya da Scroll Lock'a bas…",
-        "fare": "Fareyi de gönder (hareket, tıklar, tekerlek)",
+        "fare": "Fareyi de gönder (alanın açtıkları: tıklar, tekerlek, hareket)",
         "yansitma_acik": "YANSITMA AÇIK",
         "yansitma_kapali": "YANSITMA KAPALI",
         "acik_aciklama": "{tus} ile kapat",
@@ -43,7 +43,10 @@ METIN = {
         "yansitilan": "Yansıtılan (alanın seçtiği): {tuslar}{fare}. Diğer tuşlar bu bilgisayardan çıkmaz.",
         "yansitilan_bekle": "Hangi tuşların gideceğini alan seçer; bağlanınca burada görünür. "
                             "Listede olmayan hiçbir tuş bu bilgisayardan çıkmaz.",
-        "fare_ek": " · fare",
+        "fare_ek": " · fare: {liste}",
+        "fare_izni": "Fare:",
+        "fare_0": "Sol tık", "fare_1": "Sağ tık", "fare_2": "Orta tık", "fare_3": "Yan tuş 1", "fare_4": "Yan tuş 2",
+        "fare_5": "Tekerlek (kaydırma)", "fare_6": "Hareket",
         "izinli": "Basılabilecek tuşlar:",
         "izinli_aciklama": "Gönderen yalnız bu listedeki tuşları yollar, bu bilgisayar da yalnız bunları basar. "
                            "Windows tuşu ve F1–F12 eklenemez.",
@@ -83,7 +86,7 @@ METIN = {
         "ac_kapa": "On / off key:",
         "tus_degistir": "{tus}  (click to change)",
         "tus_bekle": "Press F1–F12 or Scroll Lock…",
-        "fare": "Also send the mouse (movement, clicks, wheel)",
+        "fare": "Also send the mouse (what the receiver allows: clicks, wheel, movement)",
         "yansitma_acik": "MIRRORING ON",
         "yansitma_kapali": "MIRRORING OFF",
         "acik_aciklama": "press {tus} to turn off",
@@ -99,7 +102,10 @@ METIN = {
         "yansitilan": "Mirrored (chosen by the receiver): {tuslar}{fare}. Other keys never leave this PC.",
         "yansitilan_bekle": "The receiver chooses which keys are sent; they show here once connected. "
                             "No key outside that list leaves this PC.",
-        "fare_ek": " · mouse",
+        "fare_ek": " · mouse: {liste}",
+        "fare_izni": "Mouse:",
+        "fare_0": "Left click", "fare_1": "Right click", "fare_2": "Middle click", "fare_3": "Side button 1",
+        "fare_4": "Side button 2", "fare_5": "Wheel (scroll)", "fare_6": "Movement",
         "izinli": "Keys it may press:",
         "izinli_aciklama": "The sender only sends keys on this list, and this PC only presses these. "
                            "The Windows key and F1–F12 can't be added.",
